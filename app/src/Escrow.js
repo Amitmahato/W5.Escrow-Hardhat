@@ -20,7 +20,7 @@ export default function Escrow({
         </li>
         <li>
           <div> Value </div>
-          <div> {value} </div>
+          <div> {value} ETH </div>
         </li>
         {approved ? (
           <div className={"complete"}> ✓ It's been approved! </div>

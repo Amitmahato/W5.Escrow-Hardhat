@@ -51,7 +51,7 @@ function App() {
 
         _escrows.push({
           address: contract.address,
-          value: balance.toString(),
+          value: ethers.utils.formatEther(balance).toString(),
           arbiter,
           beneficiary,
           depositor,
@@ -90,7 +90,7 @@ function App() {
   async function newContract() {
     const beneficiary = document.getElementById("beneficiary").value;
     const arbiter = document.getElementById("arbiter").value;
-    const value = ethers.BigNumber.from(document.getElementById("wei").value);
+    const value = ethers.utils.parseEther(document.getElementById("eth").value);
     const escrowContract = await deploy(signer, arbiter, beneficiary, value);
     storeContractAddress(escrowContract.address);
 
@@ -104,7 +104,6 @@ function App() {
     setEscrows([...escrows, escrow]);
   }
 
-  console.log(account);
   return (
     <div className="wrapper">
       <div className="contract">
@@ -120,8 +119,8 @@ function App() {
         </label>
 
         <label>
-          Deposit Amount (in Wei)
-          <input type="text" id="wei" />
+          Deposit Amount (in ETH)
+          <input type="text" id="eth" />
         </label>
 
         <div
