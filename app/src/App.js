@@ -1,8 +1,14 @@
-import { ethers } from "ethers";
-import { useEffect, useState } from "react";
+import { Contract, ethers } from "ethers";
+import { useCallback, useEffect, useState } from "react";
 import deploy from "./deploy";
 import Escrow from "./Escrow";
+import {
+  getStoredContractAddresses,
+  storeContractAddress,
+} from "./localStorage";
+import ContractJSON from "./artifacts/contracts/Escrow.sol/Escrow.json";
 
+const abi = ContractJSON.abi;
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
 export async function approve(escrowContract, signer) {
@@ -26,35 +32,81 @@ function App() {
     getAccounts();
   }, [account]);
 
+  useEffect(() => {
+    const getContracts = async () => {
+      const _escrows = [];
+      const contractAddresses = getStoredContractAddresses();
+      const escrowContracts = contractAddresses.map(
+        (address) => new Contract(address, abi, signer)
+      );
+      escrowContracts.forEach(async (contract, index) => {
+        const [arbiter, beneficiary, depositor, balance, approved] =
+          await Promise.all([
+            contract.arbiter(),
+            contract.beneficiary(),
+            contract.depositor(),
+            provider.getBalance(contract.address),
+            contract.isApproved(),
+          ]);
+
+        _escrows.push({
+          address: contract.address,
+          value: balance.toString(),
+          arbiter,
+          beneficiary,
+          depositor,
+          approved,
+        });
+
+        if (index + 1 === escrowContracts.length) {
+          setEscrows(_escrows);
+        }
+      });
+    };
+
+    getContracts();
+  }, [signer]);
+
+  const handleApprove = useCallback(
+    async (address) => {
+      const contract = new Contract(address, abi, signer);
+      contract.on("Approved", async () => {
+        const approvedContractIndex = escrows.findIndex(
+          (escrow) => escrow.address === address
+        );
+
+        setEscrows(() => {
+          const contracts = [...escrows];
+          contracts[approvedContractIndex].approved = true;
+          return contracts;
+        });
+      });
+
+      await approve(contract, signer);
+    },
+    [escrows, signer]
+  );
+
   async function newContract() {
     const beneficiary = document.getElementById("beneficiary").value;
     const arbiter = document.getElementById("arbiter").value;
     const value = ethers.BigNumber.from(document.getElementById("wei").value);
     const escrowContract = await deploy(signer, arbiter, beneficiary, value);
+    storeContractAddress(escrowContract.address);
 
     const escrow = {
       address: escrowContract.address,
       arbiter,
       beneficiary,
       value: value.toString(),
-      handleApprove: async () => {
-        // listening to Approved event from the contract
-        escrowContract.on("Approved", () => {
-          document.getElementById(escrowContract.address).className =
-            "complete";
-          document.getElementById(escrowContract.address).innerText =
-            "✓ It's been approved!";
-        });
-
-        await approve(escrowContract, signer);
-      },
     };
 
     setEscrows([...escrows, escrow]);
   }
 
+  console.log(account);
   return (
-    <>
+    <div className="wrapper">
       <div className="contract">
         <h1> New Contract </h1>
         <label>
@@ -83,6 +135,10 @@ function App() {
         >
           Deploy
         </div>
+
+        <i className="count">
+          Total Existing Contracts: <b>{escrows.length}</b>
+        </i>
       </div>
 
       <div className="existing-contracts">
@@ -90,11 +146,21 @@ function App() {
 
         <div id="container">
           {escrows.map((escrow) => {
-            return <Escrow key={escrow.address} {...escrow} />;
+            return (
+              <Escrow
+                key={escrow.address}
+                {...escrow}
+                disabled={
+                  escrow.approved ||
+                  account !== escrow.arbiter.toLocaleLowerCase()
+                }
+                handleApprove={() => handleApprove(escrow.address)}
+              />
+            );
           })}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
