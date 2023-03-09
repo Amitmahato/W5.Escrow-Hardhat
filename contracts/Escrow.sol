@@ -2,9 +2,9 @@
 pragma solidity 0.8.17;
 
 contract Escrow {
-	address public arbiter;
-	address public beneficiary;
-	address public depositor;
+	address public arbiter;		// middle man - approver
+	address public beneficiary; // seller
+	address public depositor;	// buyer
 
 	bool public isApproved;
 
